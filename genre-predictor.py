@@ -47,3 +47,47 @@ def getAccuracy(testSet, predictions):
         if testSet[i][-1] == predictions[i]:
             correct += 1
     return 1.0*correct/len(testSet)
+
+data_path = "data" # path to data set
+f = open("my.dat", 'wb')
+
+for folder in os.listdir(data_path):
+    i += 1
+    if i == 11:
+        break
+    for file in os.listdir(data_path+folder):
+        (rate,sig) = wav.read(data_path+folder+"/"+file)
+        mfcc_feat = mfcc(sig, rate, winlen=0.020, appendEnergy=False)
+        covariance = np.cov(np.matrix.transpose(mfcc_feat))
+        mean_matrix = mfcc_feat.mean(0)
+        feature = (mean_matrix, covariance, i)
+        pickle.dump(feature, f)
+
+f.close()
+
+dataset = []
+def loadDataset(filename, split, trainSet, testSet):
+    with open("my.dat", 'rb') as f:
+        while True:
+            try:
+                dataset.append(pickle.load(f))
+            except EOFError:
+                f.close()
+                break
+    
+    for i in range(len(dataset)):
+        if random.random() < split:
+            trainSet.append(dataset[i])
+        else:
+            testSet.append(dataset[i])
+
+trainingSet = []
+testingSet = []
+loadDataset("my.dat", 0.66, trainingSet, testingSet)
+
+predictions = []
+for i in range(len(testingSet)):
+    predictions.append(nearestClass(getNeighbours(trainingSet, testingSet[i], 5)))
+
+accuracy1 = getAccuracy(testingSet, predictions)
+print(accuracy1)
