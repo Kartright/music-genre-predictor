@@ -93,14 +93,12 @@ Loads dataset from file and randomly splits it into training and testing dataset
 
 Parameters:
     filename    - name of file that stores the properites of each music file
-    splits      - value between 0-1 that tells how to split the data between testing and training sets
-    dataset     - array of all audio files
-    trainSet    - array of randomly selected training audio files
-    testSet     - array of randomly selected testing audio files
+    dataset     - array of all audio file features
+
 Returns:
     N/A
 """
-def loadDataset(filename, split, dataset, trainSet, testSet):
+def loadDataset(filename, dataset):
     with open(filename, 'rb') as f: # open the file containing dataset properties
         while True:
             try:
@@ -108,7 +106,19 @@ def loadDataset(filename, split, dataset, trainSet, testSet):
             except EOFError:
                 f.close()
                 break
-    
+
+"""
+Randomly splits dataset into training and testing sets based on split
+
+Parameters:
+    splits      - value between 0-1 that tells how to split the data between testing and training sets
+    dataset     - array of all audio file features
+    trainSet    - array of randomly selected training audio files
+    testSet     - array of randomly selected testing audio files
+Returns:
+    N/A
+"""
+def randomSplit(split, dataset, trainSet, testSet):
     # Randomly split the dataset into testing and training data based on split value
     for i in range(len(dataset)):  
         if random.random() < split:
@@ -116,45 +126,80 @@ def loadDataset(filename, split, dataset, trainSet, testSet):
         else:
             testSet.append(dataset[i])
 
+"""
+Splits dataset into training and testing sets, ensuring even spread by genre
+
+Parameters:
+    splits      - value between 0-1 that tells how to split the data between testing and training sets
+    dataset     - array of all audio file features
+    trainSet    - array of randomly selected training audio files
+    testSet     - array of randomly selected testing audio files
+Returns:
+    N/A
+"""
+def splitByGenre(split, dataset, trainSet, testSet):
+    for i in range(10):
+        for k in range(len(dataset)):
+            if dataset[k][2] == i:
+                if random.random() < split:
+                    trainSet.append(dataset[k])
+                else:
+                    testSet.append(dataset[k])
+
 
 def main():
     data_path = "data/genres_original/" # path to data set
-    f = open("my.dat", 'wb')    # open file to store dataset information
+    if (not os.path.isfile("my.dat")):  # check if my.dat file already exists
+        # my.dat file does not exist, generate new file
+        f = open("my.dat", 'wb')    # open file to store dataset information
 
-    i = 0
-    for folder in os.listdir(data_path):
-        i += 1
-        if i == 11: # Only 10 genres in training set
-            break
-        for file in os.listdir(data_path+folder):   # Loop through each file in a genre folder
-            try:
-                # Get audio file properties and store information in my.dat file
-                (rate,sig) = wav.read(data_path+folder+"/"+file)
-                mfcc_feat = mfcc(sig, rate, winlen=0.020, appendEnergy=False)
-                covariance = np.cov(np.matrix.transpose(mfcc_feat))
-                mean_matrix = mfcc_feat.mean(0)
-                feature = (mean_matrix, covariance, i)
-                pickle.dump(feature, f)
-            except ValueError:
-                # Skip invalid files
-                print(f"Could not read {file}, skipping...")
+        i = 0
+        for folder in os.listdir(data_path):
+            i += 1
+            if i == 11: # Only 10 genres in training set
+                break
+            for file in os.listdir(data_path+folder):   # Loop through each file in a genre folder
+                try:
+                    # Get audio file properties and store information in my.dat file
+                    (rate,sig) = wav.read(data_path+folder+"/"+file)
+                    mfcc_feat = mfcc(sig, rate, winlen=0.020, appendEnergy=False)
+                    covariance = np.cov(np.matrix.transpose(mfcc_feat))
+                    mean_matrix = mfcc_feat.mean(0)
+                    feature = (mean_matrix, covariance, i)
+                    pickle.dump(feature, f)
+                except ValueError:
+                    # Skip invalid files
+                    print(f"Could not read {file}, skipping...")
 
-    f.close()   # Close my.dat file
+        f.close()   # Close my.dat file
 
     # Create data set partitions and load the data
     dataset = []
-    trainingSet = []
-    testingSet = []
-    loadDataset("my.dat", 0.66, dataset, trainingSet, testingSet)
+    loadDataset("my.dat", dataset)
+
+    trainingSetRand = []
+    testingSetRand = []
+    randomSplit(0.66, dataset, trainingSetRand, testingSetRand)
+
+    trainingSetEven = []
+    testingSetEven = []
+    splitByGenre(0.66, dataset, trainingSetEven, testingSetEven)
 
     # Get predictions for testing data using k-nearest neighbours
-    predictions = []
-    for i in range(len(testingSet)):
-        predictions.append(nearestClass(getNeighbours(trainingSet, testingSet[i], 5)))
+    predictionsRand = []
+    for i in range(len(testingSetRand)):
+        predictionsRand.append(nearestClass(getNeighbours(trainingSetRand, testingSetRand[i], 5)))
+
+    # Get predictions for testing data using k-nearest neighbours
+    predictionsEven = []
+    for i in range(len(testingSetEven)):
+        predictionsEven.append(nearestClass(getNeighbours(trainingSetEven, testingSetEven[i], 5)))
 
     # Calculate accuracy of model
-    accuracy1 = getAccuracy(testingSet, predictions)
+    accuracy1 = getAccuracy(testingSetRand, predictionsRand)
+    accuracy2 = getAccuracy(testingSetEven, predictionsEven)
     print(accuracy1)
+    print(accuracy2)
 
 if __name__ == "__main__":
     main()
