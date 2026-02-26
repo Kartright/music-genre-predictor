@@ -9,14 +9,14 @@ import random
 import operator
 
 """
-
+Get distance between two feature vectors
 
 Parameters:
-    instance1   -
-    instance2   -
-    k           -
+    instance1   - feature vector 1
+    instance2   - feature vector 2
+    k           - number of nearest neighbours to find
 Returns:
-    distance    -
+    distance    - distance between the two feature vectors
 """
 def distance(instance1, instance2, k):
     distance = 0
@@ -25,9 +25,9 @@ def distance(instance1, instance2, k):
     mm2 = instance2[0]
     cm2 = instance2[1]
     distance = np.trace(np.dot(np.linalg.inv(cm2), cm1))
-    distance+=(np.dot(np.dot((mm2-mm1).transpose() , np.linalg.inv(cm2)) , mm2-mm1 )) 
-    distance+= np.log(np.linalg.det(cm2)) - np.log(np.linalg.det(cm1))
-    distance-= k
+    distance += (np.dot(np.dot((mm2-mm1).transpose(), np.linalg.inv(cm2)), mm2-mm1 )) 
+    distance += np.log(np.linalg.det(cm2)) - np.log(np.linalg.det(cm1))
+    distance -= k
     return distance
 
 """
@@ -35,19 +35,19 @@ Get distance between feature vectors and find neighbours
 
 Paramters:
     trainingSet - data set of training inputs
-    instance    - 
-    k           - 
+    instance    - single instance of testing set
+    k           - number of nearest neighbours to get
 Returns:
-    neighbours  - 
+    neighbours  - k nearest training points to the given test instance
 """
 def getNeighbours(trainingSet, instance, k):
-    distances = []
-    for i in range(len(trainingSet)):
+    distances = []  # Distance to each training data point
+    for i in range(len(trainingSet)):   # Get distance from test instance to each training point
         dist = distance(trainingSet[i], instance, k) + distance(instance, trainingSet[i], k)
         distances.append((trainingSet[i][2], dist))
     distances.sort(key=operator.itemgetter(1))
     neighbours = []
-    for i in range(k):
+    for i in range(k):  # Get the k nearest training points for the test instance
         neighbours.append(distances[i][0])
     return neighbours
 
@@ -55,14 +55,14 @@ def getNeighbours(trainingSet, instance, k):
 Identify the nearest neighbours
 
 Parameters:
-    neighbours  - 
+    neighbours      - Array of k nearest neighbours to a given test input
 Returns:
-    sorter      - 
+    sorter[0][0]    - Class that appears the most in the neighbours array
 """
 def nearestClass(neighbours):
     classVote = {}
 
-    for i in range(len(neighbours)):
+    for i in range(len(neighbours)):    # Get total count of each genre that appears in the neighbours
         response = neighbours[i]
         if response in classVote:
             classVote[response] += 1
@@ -70,7 +70,7 @@ def nearestClass(neighbours):
             classVote[response] = 1
     
     sorter = sorted(classVote.items(), key = operator.itemgetter(1), reverse=True)
-    return sorter[0][0]
+    return sorter[0][0] # Return the dominant class in the nearest neighbours list
 
 """
 Model evaluation
@@ -82,11 +82,11 @@ Returns:
     accuracy    - % of test values that were correctly classified by the model
 """
 def getAccuracy(testSet, predictions):
-    correct = 0
+    correct = 0 # Total count of correct predictions
     for i in range(len(testSet)):
         if testSet[i][-1] == predictions[i]:
             correct += 1
-    return 1.0*correct/len(testSet)
+    return 1.0*correct/len(testSet) # Return % of test inputs correctly guessed
 
 """
 Loads dataset from file and randomly splits it into training and testing datasets
@@ -101,20 +101,20 @@ Returns:
     N/A
 """
 def loadDataset(filename, split, dataset, trainSet, testSet):
-    with open(filename, 'rb') as f:
+    with open(filename, 'rb') as f: # open the file containing dataset properties
         while True:
             try:
-                dataset.append(pickle.load(f))
+                dataset.append(pickle.load(f))  # put data file info into dataset array
             except EOFError:
                 f.close()
                 break
     
-    for i in range(len(dataset)):
+    # Randomly split the dataset into testing and training data based on split value
+    for i in range(len(dataset)):  
         if random.random() < split:
             trainSet.append(dataset[i])
         else:
             testSet.append(dataset[i])
-
 
 
 def main():
