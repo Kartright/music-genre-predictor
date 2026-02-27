@@ -146,6 +146,33 @@ def splitByGenre(split, dataset, trainSet, testSet):
                 else:
                     testSet.append(dataset[k])
 
+"""
+"""
+def customTest(testPath, testSet):
+    f = open("my.custom-dat", "wb")
+    
+    for file in os.listdir(testPath):
+        try:
+            # Get audio file properties and store information in my.dat file
+            (rate,sig) = wav.read(testPath+file)
+            mfcc_feat = mfcc(sig, rate, winlen=0.020, appendEnergy=False)
+            covariance = np.cov(np.matrix.transpose(mfcc_feat))
+            mean_matrix = mfcc_feat.mean(0)
+            feature = (mean_matrix, covariance)
+            pickle.dump(feature, f)
+        except ValueError:
+            # Skip invalid files
+            print(f"Could not read {file}, skipping...")
+
+    with open("my.custom-dat", 'rb') as f: # open the file containing dataset properties
+        while True:
+            try:
+                testSet.append(pickle.load(f))  # put data file info into dataset array
+            except EOFError:
+                f.close()
+                break
+
+
 
 def main():
     data_path = "data/genres_original/" # path to data set
@@ -177,13 +204,19 @@ def main():
     dataset = []
     loadDataset("my.dat", dataset)
 
+    # random split test
     trainingSetRand = []
     testingSetRand = []
     randomSplit(0.66, dataset, trainingSetRand, testingSetRand)
 
+    # Even genre split test
     trainingSetEven = []
     testingSetEven = []
     splitByGenre(0.66, dataset, trainingSetEven, testingSetEven)
+
+    # Custom test input
+    customTestSet = []
+    customTest("data/custom_tests/", customTestSet)
 
     # Get predictions for testing data using k-nearest neighbours
     predictionsRand = []
@@ -194,6 +227,10 @@ def main():
     predictionsEven = []
     for i in range(len(testingSetEven)):
         predictionsEven.append(nearestClass(getNeighbours(trainingSetEven, testingSetEven[i], 5)))
+
+    # Custom test predictions
+    for i in range(len(customTestSet)):
+        print(nearestClass(getNeighbours(dataset, customTestSet[i], 5)))
 
     # Calculate accuracy of model
     accuracy1 = getAccuracy(testingSetRand, predictionsRand)
