@@ -205,41 +205,43 @@ def main():
     loadDataset("my.dat", dataset)
 
     # random split test
-    trainingSetRand = []
-    testingSetRand = []
-    randomSplit(0.66, dataset, trainingSetRand, testingSetRand)
+    # trainingSetRand = []
+    # testingSetRand = []
+    # randomSplit(0.66, dataset, trainingSetRand, testingSetRand)
 
-    # Even genre split test
-    trainingSetEven = []
-    testingSetEven = []
-    splitByGenre(0.66, dataset, trainingSetEven, testingSetEven)
+    # # Even genre split test
+    # trainingSetEven = []
+    # testingSetEven = []
+    # splitByGenre(0.66, dataset, trainingSetEven, testingSetEven)
 
     # Custom test input
     customTestSet = []
     customTest("data/custom_tests/", customTestSet)
 
     # Get predictions for testing data using k-nearest neighbours
-    predictionsRand = []
-    for i in range(len(testingSetRand)):
-        predictionsRand.append(nearestClass(getNeighbours(trainingSetRand, testingSetRand[i], 5)))
+    #predictionsRand = []
+    #for i in range(len(testingSetRand)):
+    #    predictionsRand.append(nearestClass(getNeighbours(trainingSetRand, testingSetRand[i], 5)))
 
     # Get predictions for testing data using k-nearest neighbours
-    predictionsEven = []
-    for i in range(len(testingSetEven)):
-        predictionsEven.append(nearestClass(getNeighbours(trainingSetEven, testingSetEven[i], 5)))
+    #predictionsEven = []
+    #for i in range(len(testingSetEven)):
+    #    predictionsEven.append(nearestClass(getNeighbours(trainingSetEven, testingSetEven[i], 5)))
 
     # Custom test predictions
+    genres = list(sorted(os.listdir(data_path)))
     print("\n=============================================")
     for i in range(len(customTestSet)):
         print(customTestSet[i][2],end=": ")
-        print(nearestClass(getNeighbours(dataset, customTestSet[i], 5)))
-
-    # Calculate accuracy of model
-    accuracy1 = getAccuracy(testingSetRand, predictionsRand)
-    accuracy2 = getAccuracy(testingSetEven, predictionsEven)
+        genreIdx = nearestClass(getNeighbours(dataset, customTestSet[i], 5))
+        print(genres[genreIdx-1])
     print("=============================================")
-    print(accuracy1)
-    print(accuracy2)
+    
+    # Calculate accuracy of model
+    #accuracy1 = getAccuracy(testingSetRand, predictionsRand)
+    #accuracy2 = getAccuracy(testingSetEven, predictionsEven)
+    #print(accuracy1)
+    #print(accuracy2)
 
 if __name__ == "__main__":
     main()
