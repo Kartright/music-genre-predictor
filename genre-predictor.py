@@ -151,14 +151,14 @@ def splitByGenre(split, dataset, trainSet, testSet):
 def customTest(testPath, testSet):
     f = open("my.custom-dat", "wb")
     
-    for file in os.listdir(testPath):
+    for file in sorted(os.listdir(testPath)):
         try:
             # Get audio file properties and store information in my.dat file
             (rate,sig) = wav.read(testPath+file)
             mfcc_feat = mfcc(sig, rate, winlen=0.020, appendEnergy=False)
             covariance = np.cov(np.matrix.transpose(mfcc_feat))
             mean_matrix = mfcc_feat.mean(0)
-            feature = (mean_matrix, covariance)
+            feature = (mean_matrix, covariance, file)
             pickle.dump(feature, f)
         except ValueError:
             # Skip invalid files
@@ -181,7 +181,7 @@ def main():
         f = open("my.dat", 'wb')    # open file to store dataset information
 
         i = 0
-        for folder in os.listdir(data_path):
+        for folder in sorted(os.listdir(data_path)):
             i += 1
             if i == 11: # Only 10 genres in training set
                 break
@@ -229,12 +229,15 @@ def main():
         predictionsEven.append(nearestClass(getNeighbours(trainingSetEven, testingSetEven[i], 5)))
 
     # Custom test predictions
+    print("\n=============================================")
     for i in range(len(customTestSet)):
+        print(customTestSet[i][2],end=": ")
         print(nearestClass(getNeighbours(dataset, customTestSet[i], 5)))
 
     # Calculate accuracy of model
     accuracy1 = getAccuracy(testingSetRand, predictionsRand)
     accuracy2 = getAccuracy(testingSetEven, predictionsEven)
+    print("=============================================")
     print(accuracy1)
     print(accuracy2)
 

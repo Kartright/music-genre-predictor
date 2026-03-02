@@ -6,7 +6,9 @@ run: dependencies
 	python3 genre-predictor.py
 
 clean:
-	rm -rf my.dat
+	rm -rf my.dat my.custom-dat
+
+purge: clean
 	pip uninstall -y $(packages)
 
 dependencies:
