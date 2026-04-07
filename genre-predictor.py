@@ -147,9 +147,16 @@ def splitByGenre(split, dataset, trainSet, testSet):
                     testSet.append(dataset[k])
 
 """
+Creates cutom .dat file and loads it into a testing dataset
+
+Parameters:
+    testPath    - Path to testing data directory
+    testSet     - Array to store the test dataset
+Returns:
+    N/A
 """
 def customTest(testPath, testSet):
-    f = open("my.custom-dat", "wb")
+    f = open("my-custom.dat", "wb")
     
     for file in sorted(os.listdir(testPath)):
         try:
@@ -164,7 +171,7 @@ def customTest(testPath, testSet):
             # Skip invalid files
             print(f"Could not read {file}, skipping...")
 
-    with open("my.custom-dat", 'rb') as f: # open the file containing dataset properties
+    with open("my-custom.dat", 'rb') as f: # open the file containing dataset properties
         while True:
             try:
                 testSet.append(pickle.load(f))  # put data file info into dataset array
@@ -172,9 +179,15 @@ def customTest(testPath, testSet):
                 f.close()
                 break
 
+"""
+Creates new dat file from default audio data
 
-
-def main():
+Parameters:
+    N/A
+Returns:
+    N/A
+"""
+def createDefaultData():
     data_path = "data/genres_original/" # path to data set
     if (not os.path.isfile("my.dat")):  # check if my.dat file already exists
         # my.dat file does not exist, generate new file
@@ -200,48 +213,86 @@ def main():
 
         f.close()   # Close my.dat file
 
-    # Create data set partitions and load the data
-    dataset = []
-    loadDataset("my.dat", dataset)
+"""
+Print the program menu
+"""
+def printMenu():
+    print("=" * 40)
+    print("   Music Genre Recognition Program")
+    print("=" * 40)
+    print("1. Default Train & Test (Random Split)")
+    print("2. Default Train & Test (Genre Split)")
+    print("3. Custom Test")
+    print("=" * 40)
+    print("Enter your choice (1-3) or enter q to quit: ", end="")
 
-    # random split test
-    # trainingSetRand = []
-    # testingSetRand = []
-    # randomSplit(0.66, dataset, trainingSetRand, testingSetRand)
 
-    # # Even genre split test
-    # trainingSetEven = []
-    # testingSetEven = []
-    # splitByGenre(0.66, dataset, trainingSetEven, testingSetEven)
+def main():
+    cont = 1
+    options = ['1', '2', '3', 'q']
+    while(cont):
+        printMenu()
+        choice = input()
 
-    # Custom test input
-    customTestSet = []
-    customTest("data/custom_tests/", customTestSet)
+        while (choice not in options):
+            print("INVALID INPUT, Please enter your choice (1-3) or enter q to quit: ", end="")
+            choice = input()
+        
+        if (choice == '1'):
+            # Default Train & Test (Random Split)
+            # Create .dat file and load dataset
+            createDefaultData()
+            dataset = []
+            loadDataset("my.dat", dataset)
+            # Create train test split
+            trainingSet = []
+            testingSet = []
+            randomSplit(0.66, dataset, trainingSet, testingSet)
+            # Get preditions and accuracy
+            predictions = []
+            for i in range(len(testingSet)):
+                predictions.append(nearestClass(getNeighbours(trainingSet, testingSet[i], 5)))
+            accuracy = getAccuracy(testingSet, predictions)
+            print(f"ACCURACY: {accuracy}")
+        elif (choice == '2'):
+            # Default Train & Test (Genre Split)
+            # Create .dat file and load dataset
+            createDefaultData()
+            dataset = []
+            loadDataset("my.dat", dataset)
+            # Create train test split
+            trainingSet = []
+            testingSet = []
+            splitByGenre(0.66, dataset, trainingSet, testingSet)
+            # Get preditions and accuracy
+            predictions = []
+            for i in range(len(testingSet)):
+                predictions.append(nearestClass(getNeighbours(trainingSet, testingSet[i], 5)))
+            accuracy = getAccuracy(testingSet, predictions)
+            print(f"ACCURACY: {accuracy}")
+        elif (choice == '3'):
+            # Custom test
+            # Load training data
+            createDefaultData()
+            dataset = []
+            loadDataset("my.dat", dataset)
+            # Get testing data
+            path = input("Enter path to data: ")
+            testingSet = []
+            customTest(path, testingSet)
+            # Custom test predictions
+            genres = list(sorted(os.listdir("data/genres_original/")))
+            print("\n=============================================")
+            for i in range(len(testingSet)):
+                print(testingSet[i][2],end=": ")
+                genreIdx = nearestClass(getNeighbours(dataset, testingSet[i], 5))
+                print(genres[genreIdx-1])
+            print("=============================================")
+        elif (choice == 'q'):
+            # QUIT program
+            cont = 0
 
-    # Get predictions for testing data using k-nearest neighbours
-    #predictionsRand = []
-    #for i in range(len(testingSetRand)):
-    #    predictionsRand.append(nearestClass(getNeighbours(trainingSetRand, testingSetRand[i], 5)))
-
-    # Get predictions for testing data using k-nearest neighbours
-    #predictionsEven = []
-    #for i in range(len(testingSetEven)):
-    #    predictionsEven.append(nearestClass(getNeighbours(trainingSetEven, testingSetEven[i], 5)))
-
-    # Custom test predictions
-    genres = list(sorted(os.listdir(data_path)))
-    print("\n=============================================")
-    for i in range(len(customTestSet)):
-        print(customTestSet[i][2],end=": ")
-        genreIdx = nearestClass(getNeighbours(dataset, customTestSet[i], 5))
-        print(genres[genreIdx-1])
-    print("=============================================")
-    
-    # Calculate accuracy of model
-    #accuracy1 = getAccuracy(testingSetRand, predictionsRand)
-    #accuracy2 = getAccuracy(testingSetEven, predictionsEven)
-    #print(accuracy1)
-    #print(accuracy2)
+    return 0
 
 if __name__ == "__main__":
     main()
