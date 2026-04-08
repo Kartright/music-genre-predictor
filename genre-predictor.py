@@ -200,21 +200,21 @@ def datasetSplit():
     genres = list(sorted(os.listdir("data/genres_original/")))
     print("\n=============================================")
     for i in range(len(testDataset)):
-        print(testDataset[i][3],end=": ")
+        
         genreIdx = nearestClass(getNeighbours(trainDataset, testDataset[i], k))
         if (testDataset[i][2] != -1):
             # Only add predictions for custom files that have been sorted and add to sorted testing set
             sortedTestingSet.append(testDataset[i])
             testLabels.append(testDataset[i][2])
             predictions.append(genreIdx)
-        print(genres[genreIdx-1])
+        print(f"{genres[genreIdx-1]:<15}: {testDataset[i][3]}")
     print("=============================================")
     plotCm(testLabels, predictions, genres)
     accuracy = getAccuracy(sortedTestingSet, predictions)
     print(f"ACCURACY: {accuracy}")
 
 
-"""
+""":
 Creates new dat file from default audio data
 
 Parameters:
