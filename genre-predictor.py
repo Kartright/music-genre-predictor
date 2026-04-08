@@ -1,12 +1,14 @@
 from python_speech_features import mfcc
 import scipy.io.wavfile as wav
 import numpy as np
+import matplotlib.pyplot as plt
 import math
 from tempfile import TemporaryFile
 import os
 import pickle
 import random
 import operator
+from sklearn.metrics import confusion_matrix, classification_report, ConfusionMatrixDisplay
 
 """
 Get distance between two feature vectors
@@ -87,6 +89,25 @@ def getAccuracy(testSet, predictions):
         if testSet[i][2] == predictions[i]:
             correct += 1
     return 1.0*correct/len(testSet) # Return % of test inputs correctly guessed
+
+"""
+Plots a confusion matrix
+
+Parameters:
+    testLables  - Array of actual lables for each test value
+    predictions - Array of predicted label for each test value
+    labels      - Array of all labels
+"""
+def plotCm(testLabels, predictions, labels):
+    cm = confusion_matrix(testLabels, predictions)
+    disp = ConfusionMatrixDisplay(confusion_matrix=cm, display_labels=labels)
+    fig, ax = plt.subplots(figsize=(8, 6))
+    disp.plot(ax=ax, colorbar=True, cmap="Blues")
+    ax.set_title("MLP — Confusion Matrix (Test Set)")
+    ax.set_xlabel("Predicted Label")
+    ax.set_ylabel("True Label")
+    plt.tight_layout()
+    plt.show()
 
 """
 Loads dataset from file and randomly splits it into training and testing datasets
@@ -175,6 +196,7 @@ def datasetSplit():
     # Custom test predictions
     predictions = []
     sortedTestingSet = []
+    testLabels = []
     genres = list(sorted(os.listdir("data/genres_original/")))
     print("\n=============================================")
     for i in range(len(testDataset)):
@@ -183,9 +205,11 @@ def datasetSplit():
         if (testDataset[i][2] != -1):
             # Only add predictions for custom files that have been sorted and add to sorted testing set
             sortedTestingSet.append(testDataset[i])
+            testLabels.append(testDataset[i][2])
             predictions.append(genreIdx)
         print(genres[genreIdx-1])
     print("=============================================")
+    plotCm(testLabels, predictions, genres)
     accuracy = getAccuracy(sortedTestingSet, predictions)
     print(f"ACCURACY: {accuracy}")
 
@@ -305,8 +329,13 @@ def main():
 
             # Get preditions and accuracy
             predictions = []
+            testLabels = []
             for i in range(len(testSet)):
                 predictions.append(nearestClass(getNeighbours(trainSet, testSet[i], k)))
+                testLabels.append(testSet[i][2])
+            
+            genres = list(sorted(os.listdir("data/genres_original/")))
+            plotCm(testLabels=testLabels, predictions=predictions, labels=genres)
             accuracy = getAccuracy(testSet, predictions)
             print(f"ACCURACY: {accuracy}")
 
