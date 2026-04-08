@@ -84,7 +84,7 @@ Returns:
 def getAccuracy(testSet, predictions):
     correct = 0 # Total count of correct predictions
     for i in range(len(testSet)):
-        if testSet[i][-1] == predictions[i]:
+        if testSet[i][2] == predictions[i]:
             correct += 1
     return 1.0*correct/len(testSet) # Return % of test inputs correctly guessed
 
@@ -137,8 +137,8 @@ Parameters:
 Returns:
     N/A
 """
-def splitByGenre(split, dataset, trainSet, testSet):
-    for i in range(10):
+def genreSplit(split, dataset, trainSet, testSet):
+    for i in range(1, 11):
         for k in range(len(dataset)):
             if dataset[k][2] == i:
                 if random.random() < split:
@@ -147,95 +147,88 @@ def splitByGenre(split, dataset, trainSet, testSet):
                     testSet.append(dataset[k])
 
 """
-Creates cutom .dat file and loads it into a testing dataset
-
-Parameters:
-    testPath    - Path to testing data directory
-    testSet     - Array to store the test dataset
-Returns:
-    N/A
+Use one data set to train and one dataset to test
 """
-def customTest(testPath, testSet):
-    f = open("my-custom.dat", "wb")
-    
-    # Load audio files that have not been sorted into genres
-    for file in sorted(os.listdir(testPath)):
-        if not os.path.isfile(testPath+file):
-            continue
-        try:
-            # Get audio file properties and store information in my.dat file
-            (rate,sig) = wav.read(testPath+file)
-            mfcc_feat = mfcc(sig, rate, winlen=0.020, appendEnergy=False)
-            covariance = np.cov(np.matrix.transpose(mfcc_feat))
-            mean_matrix = mfcc_feat.mean(0)
-            feature = (mean_matrix, covariance, file, -1)
-            pickle.dump(feature, f)
-        except ValueError:
-            # Skip invalid files
-            print(f"Could not read {file}, skipping...")
-    
-    # Load files that have been sorted by genre
-    i = 0
-    for folder in sorted(os.listdir(testPath)):
-        if os.path.isfile(testPath+folder):
-            continue
-        i += 1
-        if i == 11: # Only 10 genres in training set
-            break
-        for file in os.listdir(testPath+folder):   # Loop through each file in a genre folder
-            try:
-                # Get audio file properties and store information in my.dat file
-                (rate,sig) = wav.read(testPath+folder+"/"+file)
-                mfcc_feat = mfcc(sig, rate, winlen=0.020, appendEnergy=False)
-                covariance = np.cov(np.matrix.transpose(mfcc_feat))
-                mean_matrix = mfcc_feat.mean(0)
-                feature = (mean_matrix, covariance, file, i)
-                pickle.dump(feature, f)
-            except ValueError:
-                # Skip invalid files
-                print(f"Could not read {file}, skipping...")    
+def datasetSplit():
+    # Load the training dataset
+    datasetPath = input("Enter the training dataset name: ") + ".dat"
+    while (not os.path.isfile(datasetPath)):
+        datasetPath = input("INVALID NAME, Enter the training dataset name: ") + ".dat"
+    trainDataset = []
+    loadDataset(datasetPath, trainDataset)
 
-    with open("my-custom.dat", 'rb') as f: # open the file containing dataset properties
-        while True:
-            try:
-                testSet.append(pickle.load(f))  # put data file info into dataset array
-            except EOFError:
-                f.close()
-                break
+    # Load the testing dataset
+    datasetPath = input("Enter the testing dataset name: ") + ".dat"
+    while (not os.path.isfile(datasetPath)):
+        datasetPath = input("INVALID NAME, Enter the testing dataset name: ") + ".dat"
+    testDataset = []
+    loadDataset(datasetPath, testDataset)
+
+     # Get K value
+    while True:
+        try:
+            k = int(input("Enter a K value for KNN: "))
+            break
+        except ValueError:
+            print("INVALID INPUT, please enter an int for the K value: ", end="")
+
+    # Custom test predictions
+    predictions = []
+    sortedTestingSet = []
+    genres = list(sorted(os.listdir("data/genres_original/")))
+    print("\n=============================================")
+    for i in range(len(testDataset)):
+        print(testDataset[i][3],end=": ")
+        genreIdx = nearestClass(getNeighbours(trainDataset, testDataset[i], k))
+        if (testDataset[i][2] != -1):
+            # Only add predictions for custom files that have been sorted and add to sorted testing set
+            sortedTestingSet.append(testDataset[i])
+            predictions.append(genreIdx)
+        print(genres[genreIdx-1])
+    print("=============================================")
+    accuracy = getAccuracy(sortedTestingSet, predictions)
+    print(f"ACCURACY: {accuracy}")
+
 
 """
 Creates new dat file from default audio data
 
 Parameters:
-    N/A
+    dataPath    - Path to audio data
+    newFileName - Name for new .dat file that will be created
 Returns:
     N/A
 """
-def createDefaultData():
-    data_path = "data/genres_original/" # path to data set
-    if (not os.path.isfile("my.dat")):  # check if my.dat file already exists
-        # my.dat file does not exist, generate new file
-        f = open("my.dat", 'wb')    # open file to store dataset information
+def generateDat(dataPath, newFileName):
+    newFileName = newFileName + ".dat"
+    if (not os.path.isfile(newFileName)):  # check if the .dat file with newFileName already exists
+        # newFileName.dat file does not exist, generate new file
+        f = open(newFileName, 'wb')    # open file to store dataset information
 
         i = 0
-        for folder in sorted(os.listdir(data_path)):
+        for folder in sorted(os.listdir(dataPath)):
             i += 1
             if i == 11: # Only 10 genres in training set
                 break
-            for file in os.listdir(data_path+folder):   # Loop through each file in a genre folder
+            for file in sorted(os.listdir(dataPath+folder)):   # Loop through each file in a genre folder
                 try:
                     # Get audio file properties and store information in my.dat file
-                    (rate,sig) = wav.read(data_path+folder+"/"+file)
+                    (rate,sig) = wav.read(dataPath+folder+"/"+file)
+                    if (len(sig) == 0):
+                        print(f"No audio in {file}, skipping...")
+                        continue
                     mfcc_feat = mfcc(sig, rate, winlen=0.020, appendEnergy=False)
                     covariance = np.cov(np.matrix.transpose(mfcc_feat))
                     mean_matrix = mfcc_feat.mean(0)
-                    feature = (mean_matrix, covariance, i)
+                    feature = (mean_matrix, covariance, i, file)
                     pickle.dump(feature, f)
                 except ValueError:
                     # Skip invalid files
                     print(f"Could not read {file}, skipping...")
 
         f.close()   # Close my.dat file
+    else:
+        print("A .dat file with that name already exists")
 
 """
 Print the program menu
@@ -244,73 +237,77 @@ def printMenu():
     print("=" * 40)
     print("   Music Genre Recognition Program")
     print("=" * 40)
-    print("1. Default Train & Test (Random Split)")
-    print("2. Default Train & Test (Genre Split)")
-    print("3. Custom Test")
+    print("1. Generate Dataset")
+    print("2. Train & Test")
     print("=" * 40)
-    print("Enter your choice (1-3) or enter q to quit: ", end="")
+    print("Enter your choice (1-2) or enter q to quit: ", end="")
 
 
 def main():
     cont = 1
-    options = ['1', '2', '3', 'q']
+    options = ['1', '2', '3', '4', '5', 'q']
     while(cont):
         printMenu()
         choice = input()
 
         while (choice not in options):
-            print("INVALID INPUT, Please enter your choice (1-3) or enter q to quit: ", end="")
+            print("INVALID INPUT, Please enter your choice (1-5) or enter q to quit: ", end="")
             choice = input()
         
-        # Load default data into my.dat
-        createDefaultData()
-        dataset = []
-        loadDataset("my.dat", dataset)
-        
-        if (choice == '1'): # DEFAULT TRAIN & TEST (RANDOM SPLIT)
-            # Create train test split
-            trainingSet = []
-            testingSet = []
-            randomSplit(0.66, dataset, trainingSet, testingSet)
-            # Get preditions and accuracy
-            predictions = []
-            for i in range(len(testingSet)):
-                predictions.append(nearestClass(getNeighbours(trainingSet, testingSet[i], 5)))
-            accuracy = getAccuracy(testingSet, predictions)
-            print(f"ACCURACY: {accuracy}")
-
-        elif (choice == '2'): # DEFAULT TRAIN & TEST (GENRE SPLIT)
-            # Create train test split
-            trainingSet = []
-            testingSet = []
-            splitByGenre(0.66, dataset, trainingSet, testingSet)
-            # Get preditions and accuracy
-            predictions = []
-            for i in range(len(testingSet)):
-                predictions.append(nearestClass(getNeighbours(trainingSet, testingSet[i], 5)))
-            accuracy = getAccuracy(testingSet, predictions)
-            print(f"ACCURACY: {accuracy}")
-
-        elif (choice == '3'): # CUSTOM TEST
-            # Get testing data
+        if (choice == '1'): # GENERATE DATASET
             path = input("Enter path to data: ")
-            testingSet = []
-            customTest(path, testingSet)
-            # Custom test predictions
+            newFileName = input("Enter name for dataset: ")
+            generateDat(path, newFileName)
+            print("Dataset generated!")
+
+        elif (choice == '2'): # TRAIN & TEST
+            # Get split type
+            splitType = input("1 = Random\n2 = By Genre\n3 = By Dataset\nChoose a split type: ")
+            while (splitType not in ['1','2','3']):
+                splitType = input("INVALID SELECTION\n1 = Random\n2 = By Genre\nChoose a split type: ")
+
+            if (splitType == '3'):
+                datasetSplit()
+                continue
+            
+            # Load the dataset to use
+            datasetPath = input("Enter the dataset name: ") + ".dat"
+            while (not os.path.isfile(datasetPath)):
+                datasetPath = input("INVALID NAME, Enter the dataset name: ") + ".dat"
+            dataset = []
+            loadDataset(datasetPath, dataset)
+
+            # Get a split
+            while True:
+                try:
+                    split = float(input("Enter a data split (0-1): "))
+                    if 0 < split < 1:
+                        break
+                    print("Must be value between 0-1, try again: ", end="")
+                except ValueError:
+                    print("INVALID INPUT, please enter a number: ", end="")
+
+            # Get K value
+            while True:
+                try:
+                    k = int(input("Enter a K value for KNN: "))
+                    break
+                except ValueError:
+                    print("INVALID INPUT, please enter an int for the K value: ", end="")
+
+            # Create train test split
+            trainSet = []
+            testSet = []
+            if (splitType == '1'):
+                randomSplit(split, dataset, trainSet, testSet)
+            elif (splitType == '2'):
+                genreSplit(split, dataset, trainSet, testSet)
+
+            # Get preditions and accuracy
             predictions = []
-            sortedTestingSet = []
-            genres = list(sorted(os.listdir("data/genres_original/")))
-            print("\n=============================================")
-            for i in range(len(testingSet)):
-                print(testingSet[i][2],end=": ")
-                genreIdx = nearestClass(getNeighbours(dataset, testingSet[i], 5))
-                if (testingSet[i][-1] != -1):
-                    # Only add predictions for custom files that have been sorted and add to sorted testing set
-                    sortedTestingSet.append(testingSet[i])
-                    predictions.append(genreIdx)
-                print(genres[genreIdx-1])
-            print("=============================================")
-            accuracy = getAccuracy(sortedTestingSet, predictions)
+            for i in range(len(testSet)):
+                predictions.append(nearestClass(getNeighbours(trainSet, testSet[i], k)))
+            accuracy = getAccuracy(testSet, predictions)
             print(f"ACCURACY: {accuracy}")
 
         elif (choice == 'q'): # QUIT PROGRAM
