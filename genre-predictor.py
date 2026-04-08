@@ -412,9 +412,10 @@ def main():
                 if genAudio == 'y':
                     outDir = input("Output folder (default: representative_songs/): ").strip()
                     #use default file of "data/custom_tests/" unless mentioned otherwise
-                    datapathDir = input("Input folder (wav files of your testing data): ").strip()
+                    datapathDir = input("Input folder (wav files of your testing data, default: data/custom_tests/): ").strip()
                     generateRepresentativeGenreSongs(testLabels, predictions, genres, dataPath=datapathDir,
-                                            outputDir=outDir if outDir else "representative_songs/")
+                                                     dataPath=datapathDir if datapathDir else "data/custom_tests/",
+                                                     outputDir=outDir if outDir else "representative_songs/")
                 continue
             
             # Load the dataset to use
