@@ -11,10 +11,6 @@ import operator
 import shutil
 from sklearn.metrics import confusion_matrix, classification_report, ConfusionMatrixDisplay
 
-import os
-import shutil
-import operator
-
 """
 For each predicted genre, find the medoid song:
 the real song in that predicted group with the smallest total distance
