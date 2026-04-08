@@ -270,9 +270,11 @@ Use one data set to train and one dataset to test
 Parameters:
     N/A
 Returns:
-    sortedTestingData   -
-    predictions         - 
-    genres              -
+    sortedTestingSet    - array of labelled test samples that were classified
+                          (entries from testDataset where label != -1)
+    predictions         - array of predicted genre indices for each entry in
+                          sortedTestingSet, aligned by index
+    genres              - ordered array of genre name strings
 """
 def datasetSplit():
     # Load the training dataset
