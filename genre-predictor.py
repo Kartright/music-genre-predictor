@@ -1,4 +1,4 @@
-from python_speech_features import mfcc
+from python_speech_features import mfcc, delta
 import scipy.io.wavfile as wav
 import numpy as np
 import matplotlib.pyplot as plt
@@ -8,7 +8,87 @@ import os
 import pickle
 import random
 import operator
+import shutil
 from sklearn.metrics import confusion_matrix, classification_report, ConfusionMatrixDisplay
+
+"""
+For each predicted genre, find the medoid song:
+the real song in that predicted group with the smallest total distance
+to all other songs in the same predicted group.
+
+Parameters:
+    testDataset  - list of (mean_mfcc, covariance, genre_idx, filename) tuples
+                   for each test sample (sorted, no label -1 entries)
+    predictions  - list of predicted genre indices (1-based), aligned with testDataset
+    genres       - ordered list of genre name strings
+    dataPath     - root path to genre folders, e.g. "data/genres_original/"
+    outputDir    - folder to copy representative .wav files into
+"""
+def generateRepresentativeGenreSongs(testDataset, predictions, genres,
+                                     dataPath="data/custom_tests/", outputDir="representative_songs/"):
+    os.makedirs(outputDir, exist_ok=True)
+
+    # Group test samples by predicted genre
+    predicted_groups = {i + 1: [] for i in range(len(genres))}
+    for i, entry in enumerate(testDataset):
+        pred_genre_idx = predictions[i]
+        predicted_groups[pred_genre_idx].append(entry)
+
+
+    print("\nGenerating representative song per predicted genre...")
+    print("=" * 65)
+
+    for genre_idx, group in predicted_groups.items():
+        genre_name = genres[genre_idx - 1]
+
+        if not group:
+            print(f"{genre_name:<12}: no samples predicted as this genre, skipping")
+            continue
+
+        # If only one song is in the group, it is automatically the medoid
+        if len(group) == 1:
+            best_entry = group[0]
+            best_score = 0.0
+        else:
+            best_entry = None
+            best_score = float("inf")
+
+            # Find the medoid in the true predicted group with the lowest average distance to all others in the predicted group
+            for i in range(len(group)):
+                total_dist = 0.0
+
+                for j in range(len(group)):
+                    if(i == j):
+                        continue
+                    d = distance(group[i], group[j], 0) + distance(group[j], group[i], 0)
+                    total_dist += d
+
+                avg_dist = total_dist / (len(group) - 1)
+
+                if avg_dist < best_score:
+                    best_score = avg_dist
+                    best_entry = group[i]
+
+        true_genre_idx = best_entry[2]
+        true_genre_name = genres[true_genre_idx - 1]
+        filename = best_entry[3]
+
+        # Assumes files are stored as dataPath/<true genre>/<filename>
+        src = os.path.join(dataPath, true_genre_name, filename)
+        dst = os.path.join(outputDir, f"{genre_name}_representative.wav")
+
+        try:
+            shutil.copy(src, dst)
+            print(
+                f"{genre_name:<12}: {filename} "
+                f"(true={true_genre_name}, predicted-group size={len(group)}, "
+                f"avg dist={best_score:.4f})"
+            )
+        except Exception as e:
+            print(f"{genre_name:<12}: representative found, but could not copy {src}: {e}")
+
+    print("=" * 65)
+    print(f"Representative songs saved to '{outputDir}'")
 
 """
 Get distance between two feature vectors
@@ -29,50 +109,63 @@ def distance(instance1, instance2, k):
     distance = np.trace(np.dot(np.linalg.inv(cm2), cm1))
     distance += (np.dot(np.dot((mm2-mm1).transpose(), np.linalg.inv(cm2)), mm2-mm1 )) 
     distance += np.log(np.linalg.det(cm2)) - np.log(np.linalg.det(cm1))
-    distance -= k
+    distance -= len(mm1)
     return distance
 
 """
-Get distance between feature vectors and find neighbours
+Get computes the symmetic distance between test sample and all training samples,
+sorts training data by distance, and returns the k nearest neighbours
 
 Paramters:
     trainingSet - data set of training inputs
     instance    - single instance of testing set
     k           - number of nearest neighbours to get
 Returns:
-    neighbours  - k nearest training points to the given test instance
+    neighbours  - array of k (class, distance) nearest training points to 
+    the given test instance, sorted from smallest to largest
 """
 def getNeighbours(trainingSet, instance, k):
-    distances = []  # Distance to each training data point
-    for i in range(len(trainingSet)):   # Get distance from test instance to each training point
+    distances = []
+
+    for i in range(len(trainingSet)):
         dist = distance(trainingSet[i], instance, k) + distance(instance, trainingSet[i], k)
-        distances.append((trainingSet[i][2], dist))
+        distances.append((trainingSet[i][2], dist))  # (classLabel, distance)
+
     distances.sort(key=operator.itemgetter(1))
+
     neighbours = []
-    for i in range(k):  # Get the k nearest training points for the test instance
-        neighbours.append(distances[i][0])
+    for i in range(min(k, len(distances))):
+        neighbours.append(distances[i])   # keep both label and distance
+
     return neighbours
 
 """
-Identify the nearest neighbours
+Identify the nearest neighbours using distance-weighted. 
+Neighbours closer to a target have a stronger influence. 
+Inlfuence is equal to the inverse of the its distance sqaured 
 
 Parameters:
-    neighbours      - Array of k nearest neighbours to a given test input
+    neighbours      - Array of k nearest neighbours in the form of (class, distance)
 Returns:
-    sorter[0][0]    - Class that appears the most in the neighbours array
+    sorter[0][0]    - Class (label) that appears the most in the neighbours array
 """
 def nearestClass(neighbours):
     classVote = {}
 
-    for i in range(len(neighbours)):    # Get total count of each genre that appears in the neighbours
-        response = neighbours[i]
-        if response in classVote:
-            classVote[response] += 1
+    for i in range(len(neighbours)):
+        #class is a keyword use label instead
+        label, dist = neighbours[i]
+
+        safeDist = max(abs(dist), 1e-9) #add barrier for extremely small distances
+        weight = 1 / (safeDist **2)
+
+        if label in classVote:
+            classVote[label] += weight
         else:
-            classVote[response] = 1
-    
-    sorter = sorted(classVote.items(), key = operator.itemgetter(1), reverse=True)
-    return sorter[0][0] # Return the dominant class in the nearest neighbours list
+            classVote[label] = weight
+
+    sorter = sorted(classVote.items(), key=operator.itemgetter(1), reverse=True)
+    return sorter[0][0]
 
 """
 Model evaluation
@@ -103,7 +196,7 @@ def plotCm(testLabels, predictions, labels):
     disp = ConfusionMatrixDisplay(confusion_matrix=cm, display_labels=labels)
     fig, ax = plt.subplots(figsize=(8, 6))
     disp.plot(ax=ax, colorbar=True, cmap="Blues")
-    ax.set_title("MLP — Confusion Matrix (Test Set)")
+    ax.set_title("Genre Classification Confusion Matrix")
     ax.set_xlabel("Predicted Label")
     ax.set_ylabel("True Label")
     plt.tight_layout()
@@ -169,6 +262,15 @@ def genreSplit(split, dataset, trainSet, testSet):
 
 """
 Use one data set to train and one dataset to test
+
+Parameters:
+    N/A
+Returns:
+    sortedTestingSet    - array of labelled test samples that were classified
+                          (entries from testDataset where label != -1)
+    predictions         - array of predicted genre indices for each entry in
+                          sortedTestingSet, aligned by index
+    genres              - ordered array of genre name strings
 """
 def datasetSplit():
     # Load the training dataset
@@ -213,6 +315,8 @@ def datasetSplit():
     accuracy = getAccuracy(sortedTestingSet, predictions)
     print(f"ACCURACY: {accuracy}")
 
+    return sortedTestingSet, predictions, genres
+
 
 """:
 Creates new dat file from default audio data
@@ -241,10 +345,20 @@ def generateDat(dataPath, newFileName):
                     if (len(sig) == 0):
                         print(f"No audio in {file}, skipping...")
                         continue
+                    #Use delta to store more information in DAT file
                     mfcc_feat = mfcc(sig, rate, winlen=0.020, appendEnergy=False)
-                    covariance = np.cov(np.matrix.transpose(mfcc_feat))
-                    mean_matrix = mfcc_feat.mean(0)
+                    #compute first and second derivative of MFCC over time
+                    delta_feat = delta(mfcc_feat, 2)
+                    delta2_feat = delta(delta_feat, 2)
+                    #combine into 1 array
+                    combined_feat = np.hstack((mfcc_feat, delta_feat, delta2_feat))
+                    #compute covariance and weigh diagonals slightly more
+                    covariance = np.cov(combined_feat.T)
+                    covariance += 1e-6 * np.eye(covariance.shape[0])
+                    #compute average across MFCC, first derivative, and second derivative
+                    mean_matrix = combined_feat.mean(0)
                     feature = (mean_matrix, covariance, i, file)
+
                     pickle.dump(feature, f)
                 except ValueError:
                     # Skip invalid files
@@ -291,7 +405,17 @@ def main():
                 splitType = input("INVALID SELECTION\n1 = Random\n2 = By Genre\nChoose a split type: ")
 
             if (splitType == '3'):
-                datasetSplit()
+                testLabels, predictions, genres = datasetSplit()
+
+                #Ask user for song in tested data that has smallest distance to all other predicted songs
+                genAudio = input("\nGenerate confusion audio clips? (y/n): ").strip().lower()
+                if genAudio == 'y':
+                    outDir = input("Output folder (default: representative_songs/): ").strip()
+                    #use default file of "data/custom_tests/" unless mentioned otherwise
+                    datapathDir = input("Input folder (wav files of your testing data, default: data/custom_tests/): ").strip()
+                    generateRepresentativeGenreSongs(testLabels, predictions, genres,
+                                                     dataPath=datapathDir if datapathDir else "data/custom_tests/",
+                                                     outputDir=outDir if outDir else "representative_songs/")
                 continue
             
             # Load the dataset to use
