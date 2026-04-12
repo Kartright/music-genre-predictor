@@ -196,7 +196,7 @@ def plotCm(testLabels, predictions, labels):
     disp = ConfusionMatrixDisplay(confusion_matrix=cm, display_labels=labels)
     fig, ax = plt.subplots(figsize=(8, 6))
     disp.plot(ax=ax, colorbar=True, cmap="Blues")
-    ax.set_title("MLP — Confusion Matrix (Test Set)")
+    ax.set_title("Genre Classification Confusion Matrix")
     ax.set_xlabel("Predicted Label")
     ax.set_ylabel("True Label")
     plt.tight_layout()
@@ -413,7 +413,7 @@ def main():
                     outDir = input("Output folder (default: representative_songs/): ").strip()
                     #use default file of "data/custom_tests/" unless mentioned otherwise
                     datapathDir = input("Input folder (wav files of your testing data, default: data/custom_tests/): ").strip()
-                    generateRepresentativeGenreSongs(testLabels, predictions, genres, dataPath=datapathDir,
+                    generateRepresentativeGenreSongs(testLabels, predictions, genres,
                                                      dataPath=datapathDir if datapathDir else "data/custom_tests/",
                                                      outputDir=outDir if outDir else "representative_songs/")
                 continue
